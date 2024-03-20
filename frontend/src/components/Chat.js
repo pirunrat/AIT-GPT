@@ -13,11 +13,11 @@ const Chat = () => {
 
         try {
             
-            const response = await axios.post('http://localhost:5000/question', { word: inputWord});
+            const response = await axios.post('http://localhost:5000/question', { "question": inputWord});
 
             if (response && response.data) {
                 setResponse(response.data); 
-                console.log(response.data);
+                console.log(response.data.answer);
             }
         } catch (error) {
             console.error('Error making request:', error);
@@ -43,7 +43,7 @@ const Chat = () => {
             {response && (
                 <div className="response-container">
                     <p>Answer:</p>
-                    <p>{response}</p>
+                    <p>{response.answer}</p>
                 </div>
             )}
         </div>

@@ -25,15 +25,30 @@ def ask_question():
     try:
         data = request.json
         question = data.get('question')
+        print(f'question : {question}')
 
         # Use the model instance to generate an answer
         answer = model_instance.answer_question(question)
+        print(f'asnwer : {answer}')
 
-        return jsonify({'answer': answer})
+        # Extract relevant information from Document objects
+        source_documents = []
+        for doc in answer.get('source_documents', []):
+            source_documents.append({
+                'page_content': doc.page_content,
+                'metadata': doc.metadata
+            })
+
+        # Return the answer along with serialized source documents
+        return jsonify({
+            'answer': answer['answer'],
+            'source_documents': source_documents
+        })
     except KeyError as e:
         return jsonify({'error': f"KeyError: {str(e)}"}), 404
     except Exception as e:
         return jsonify({'error': f"An error occurred: {str(e)}"}), 500
+
 
 
 

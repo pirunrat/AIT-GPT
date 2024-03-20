@@ -6,7 +6,7 @@ from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain.embeddings import HuggingFaceInstructEmbeddings
 from langchain.vectorstores import FAISS
 from langchain.memory import ChatMessageHistory
-from transformers import AutoTokenizer, pipeline, AutoModelForSeq2SeqLM
+from transformers import AutoTokenizer, pipeline, AutoModelForCausalLM
 from langchain import HuggingFacePipeline
 from langchain.chains import LLMChain
 from langchain.chains.conversational_retrieval.prompts import CONDENSE_QUESTION_PROMPT
@@ -17,7 +17,7 @@ from langchain.chains import ConversationalRetrievalChain
 class Model:
     def __init__(self):
         try:
-            self.device = torch.device('cuda'if torch.cuda.is_available() else 'cpu')
+            self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
             # Prompt Section
             prompt_template = """
@@ -56,36 +56,34 @@ class Model:
             # Memory
             self.history = ChatMessageHistory()
 
-            # Chain
-            model_id = 'fastchat-t5-3b-v1.0'
+            # Load GPT-2 model and tokenizer
+            model_id = 'gpt2'
             tokenizer = AutoTokenizer.from_pretrained(model_id)
-            tokenizer.pad_token_id = tokenizer.eos_token_id
-            model = AutoModelForSeq2SeqLM.from_pretrained(model_id)
+            model = AutoModelForCausalLM.from_pretrained(model_id)
 
-            pipe = pipeline(task="text2text-generation", model=model, tokenizer=tokenizer, max_new_tokens=256,
-                            model_kwargs={"temperature": 0, "repetition_penalty": 1.5})
+            # Define conversation pipeline
+            pipe = pipeline(task="text-generation", model=model, tokenizer=tokenizer, max_length=256,
+                            model_kwargs={"temperature": 0.7, "repetition_penalty": 1.2})
 
+            # Wrap the pipeline in a HuggingFacePipeline object
             llm = HuggingFacePipeline(pipeline=pipe)
+
+            # Initialize the question generator with GPT-2
             question_generator = LLMChain(llm=llm, prompt=CONDENSE_QUESTION_PROMPT, verbose=True)
 
-            query = 'Comparing both of them'
-            chat_history = "Human:What is Machine Learning\nAI:\nHuman:What is Deep Learning\nAI:"
-
-            question_generator({'chat_history': chat_history, "question": query})
-
+            # Load your document retrieval chain (assuming it's compatible with GPT-2)
             doc_chain = load_qa_chain(llm=llm, chain_type='stuff', prompt=self.PROMPT, verbose=True)
-            query = "What is AIT"
-            input_document = self.retriever.get_relevant_documents(query)
 
-            doc_chain({'input_documents': input_document, 'question': query})
-
+            # Initialize memory for conversation history
             memory = ConversationBufferWindowMemory(k=3, memory_key="chat_history", return_messages=True,
                                                     output_key='answer')
 
+            # Create the conversational retrieval chain with GPT-2
             chain = ConversationalRetrievalChain(retriever=self.retriever, question_generator=question_generator,
                                                 combine_docs_chain=doc_chain, return_source_documents=True,
                                                 memory=memory, verbose=True, get_chat_history=lambda h: h)
 
+            # Assign the chain to your object
             self.chain = chain
 
         except KeyError as e:
@@ -98,3 +96,13 @@ class Model:
         except Exception as e:
             print(f'Error answering question: {e}')
             return None
+
+
+
+# # Create an instance of Model
+# model = Model()
+
+# # Test the answer_question method with a sample question
+# question = "What is the Asian Institute of Technology?"
+# answer = model.answer_question(question)
+# print("Answer:", answer)
